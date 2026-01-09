@@ -1,5 +1,5 @@
-use rand::rngs::ThreadRng;
 use rand::Rng;
+use rand::rngs::ThreadRng;
 
 // material.rs
 use crate::geometry::Vec3;
@@ -136,11 +136,13 @@ impl Material for Dielectric {
         };
         let in_direction = Vec3::normalize(ray_in.direction);
         let cos_theta = 1.0_f64.min(hit_rec.normal.dot(-in_direction));
-        let sin_theta = (1.0-cos_theta*cos_theta).sqrt();
+        let sin_theta = (1.0 - cos_theta * cos_theta).sqrt();
 
         // Snell's law: total internal reflection occurs when refraction ratio * sin(theta) > 1
         let cannot_refract = refract * sin_theta > 1.0;
-        let out_direction = if cannot_refract || self.schlick_approx(cos_theta, refract) > rng.gen_range(0.0..1.0){
+        let out_direction = if cannot_refract
+            || self.schlick_approx(cos_theta, refract) > rng.gen_range(0.0..1.0)
+        {
             Vec3::reflect(in_direction, hit_rec.normal)
         } else {
             Vec3::refract(in_direction, hit_rec.normal, refract)

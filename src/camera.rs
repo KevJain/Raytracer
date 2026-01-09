@@ -11,11 +11,13 @@ use crate::material::WHITE;
 use crate::math::Interval;
 use crate::ray::Ray;
 use crate::shapes::{Hittable, World};
+use chrono::Local;
 use rand::Rng;
 use rand::rngs::ThreadRng;
 use rayon::prelude::*;
 use std::fs::File;
-use std::io::{self, BufWriter, Result, Write};
+use std::fs::create_dir_all;
+use std::io::{self, BufWriter, Result, Write}; // For timestamping output files
 
 pub struct Camera {
     pub image_width: u32,
@@ -29,7 +31,7 @@ pub struct Camera {
     delta_u: Vec3,
     delta_v: Vec3,
     lens_u: Vec3,
-    lens_v: Vec3
+    lens_v: Vec3,
 }
 
 impl Camera {
@@ -38,8 +40,8 @@ impl Camera {
         image_width: u32,
         location: Point3,
         view_target: Point3,
-        focal_length: f64,
-        focal_angle: f64, /* Degrees */
+        focal_length: f64, // If view target is set, then focal length will be calculated from view target
+        focal_angle: f64,  /* Degrees */
         vfov: f64,
         samples: u32,
         max_depth: i32,
@@ -71,13 +73,14 @@ impl Camera {
         let pixel_delta_v = viewport_v / image_height as f64;
 
         // Calculate the location relative to the camera of the upper left point of the viewport
-        let viewport_upper_left: Point3 = location - (focal_length * w) - (viewport_u + viewport_v) / 2.0;
+        let viewport_upper_left: Point3 =
+            location - (focal_length * w) - (viewport_u + viewport_v) / 2.0;
 
         // New origin for the viewport coordinates: offset by half of pixel gap to get pixel center
         let pixel00: Point3 = viewport_upper_left + (pixel_delta_u + pixel_delta_v) / 2.0;
 
         // Calculate the disk parallel to the viewport plane from which we will cast our rays
-        let lens_radius = focal_length * (degrees_to_radians(focal_angle)/2.0).tan();
+        let lens_radius = focal_length * (degrees_to_radians(focal_angle) / 2.0).tan();
         let lens_u = u * lens_radius;
         let lens_v = v * lens_radius;
 
@@ -92,7 +95,7 @@ impl Camera {
             delta_u: pixel_delta_u,
             delta_v: pixel_delta_v,
             lens_u,
-            lens_v
+            lens_v,
         }
     }
 
@@ -132,6 +135,42 @@ impl Camera {
         Ok(())
     }
 
+    pub fn progressive_render(&self, world: &World, image_samples: &Vec<u64>) -> io::Result<()> {
+        println!(
+            "Progressively rendering {} x {} image",
+            self.image_width, self.image_height
+        );
+        println!("Samples per pixel: {:?}", image_samples);
+        let mut img_buffer: Vec<Color> =
+            vec![Color::default(); (self.image_width * self.image_height) as usize];
+        let mut prev_samples: u64 = 0;
+        let ts = Local::now().format("%Y%m%d_%H%M%S").to_string();
+        let path_name = format!("./output/{}", ts);
+        create_dir_all(&path_name)?;
+        for cur_samples in image_samples {
+            io::stdout().flush()?;
+            print!("\rRendering {} sample image", cur_samples);
+            img_buffer
+                .par_iter_mut()
+                .enumerate()
+                .for_each(|(pixel_num, pixel)| {
+                    let mut rng: ThreadRng = rand::thread_rng();
+                    for i in prev_samples..*cur_samples {
+                        let row: u32 = (pixel_num as u32 / self.image_width) as u32;
+                        let col: u32 = (pixel_num as u32 % self.image_width) as u32;
+                        let ray = self.get_ray(row, col, &mut rng);
+                        *pixel = *pixel + Camera::ray_color(&ray, world, &mut rng, self.max_depth);
+                    }
+                });
+            let output_colors: Vec<Color> = img_buffer.iter().map(|&x| Self::color_gamma_transform(x / *cur_samples as f64, 2.0)).collect();
+            let file_name = format!("{}/{}.ppm", path_name, cur_samples);
+            Camera::write_file(&file_name, self.image_width, self.image_height, output_colors)?;
+            prev_samples = *cur_samples;
+        }
+        println!("");
+        Ok(())
+    }
+
     fn get_ray(&self, pixel_row: u32, pixel_col: u32, rng: &mut ThreadRng) -> Ray {
         // Pixels are located at the center of the square they occupy
         // Thus, we sample an offset in [-0.5,0.5) x [-0.5,0.5) to get a ray in the sample pixel
@@ -154,6 +193,21 @@ impl Camera {
         let offset = Vec3::sample_unit_disk(rng);
         //println!("{:?}", offset);
         self.location + offset.x * self.lens_u + offset.y * self.lens_v
+    }
+
+    fn write_file(file_path: &String, width: u32, height: u32, img: Vec<Color>) -> io::Result<()> {
+        let file = File::create(file_path)?;
+        let mut writer = BufWriter::new(file);
+        writeln!(writer, "P3")?;
+        writeln!(writer, "{} {} ", width, height)?;
+        writeln!(writer, "255")?;
+        for color in img {
+            let rbyte = (color.x * 255.999) as u8;
+            let gbyte = (color.y * 255.999) as u8;
+            let bbyte = (color.z * 255.999) as u8;
+            writeln!(writer, "{} {} {}", rbyte, gbyte, bbyte)?;
+        }
+        Ok(())
     }
 
     fn write_line<W: Write>(writer: &mut W, line_buffer: &Vec<Color>) {
