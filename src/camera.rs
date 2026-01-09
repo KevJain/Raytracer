@@ -147,7 +147,7 @@ impl Camera {
         let ts = Local::now().format("%Y%m%d_%H%M%S").to_string();
         let path_name = format!("./output/{}", ts);
         create_dir_all(&path_name)?;
-        for cur_samples in image_samples {
+        for (i, cur_samples) in image_samples.iter().enumerate() {
             io::stdout().flush()?;
             print!("\rRendering {} sample image", cur_samples);
             img_buffer
@@ -163,7 +163,7 @@ impl Camera {
                     }
                 });
             let output_colors: Vec<Color> = img_buffer.iter().map(|&x| Self::color_gamma_transform(x / *cur_samples as f64, 2.0)).collect();
-            let file_name = format!("{}/{}.ppm", path_name, cur_samples);
+            let file_name = format!("{}/{:04}.ppm", path_name, i + 1);
             Camera::write_file(&file_name, self.image_width, self.image_height, output_colors)?;
             prev_samples = *cur_samples;
         }
