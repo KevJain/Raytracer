@@ -3,10 +3,10 @@ use std::sync::Arc;
 // shapes.rs
 // Defines primitive shapes and their geometry
 use crate::geometry::{Point3, Vec3};
-use crate::ray::Ray;
-use crate::math::Interval;
-use crate::material::Material;
 use crate::material::DefaultMaterial;
+use crate::material::Material;
+use crate::math::Interval;
+use crate::ray::Ray;
 
 #[derive(Debug)]
 pub struct HitRecord {
@@ -14,7 +14,7 @@ pub struct HitRecord {
     pub normal: Vec3,
     pub t: f64,
     pub front_face: bool,
-    pub material: Arc<dyn Material>
+    pub material: Arc<dyn Material>,
 }
 
 impl HitRecord {
@@ -24,7 +24,7 @@ impl HitRecord {
         if self.front_face {
             self.normal = outward_normal
         } else {
-            /* 
+            /*
             println!("Inside sphere!");
             println!("{:?}", ray);
             println!("{:?}", ray.direction.dot(outward_normal));
@@ -33,7 +33,7 @@ impl HitRecord {
             //println!("{:?}", outward_normal);
             */
             self.normal = -outward_normal
-        };
+        }
     }
 }
 
@@ -42,7 +42,7 @@ pub trait Hittable {
 }
 
 pub struct Sphere {
-    pub label : String,
+    pub label: String,
     pub center: Point3,
     pub radius: f64,
 }
@@ -81,12 +81,16 @@ impl Hittable for Sphere {
 
 impl Sphere {
     pub fn new(x: f64, y: f64, z: f64, radius: f64) -> Self {
-        Sphere { label: "".to_string(), center: Point3::new(x, y, z), radius: radius }
+        Sphere {
+            label: "".to_string(),
+            center: Point3::new(x, y, z),
+            radius: radius,
+        }
     }
 }
 
 pub enum Shape {
-    Sphere(Sphere)
+    Sphere(Sphere),
 }
 
 impl Hittable for Shape {
@@ -101,7 +105,7 @@ pub struct World {
     // Note: monomorphization was used for shape determination, but dynamic dispatch
     // was used for material allocation. Consider tradeoffs of each.
     pub objects: Vec<(Shape, usize)>, // Each object is represented by its shape and index of material in materials
-    pub materials: Vec<Arc<dyn Material>>
+    pub materials: Vec<Arc<dyn Material>>,
 }
 
 impl Hittable for World {
@@ -121,7 +125,10 @@ impl Hittable for World {
 
 impl World {
     pub fn new() -> Self {
-        World { objects: vec![], materials: vec![Arc::new(DefaultMaterial{})]}
+        World {
+            objects: vec![],
+            materials: vec![Arc::new(DefaultMaterial {})],
+        }
     }
     pub fn new_hitrecord(&self) -> HitRecord {
         HitRecord {
@@ -129,12 +136,12 @@ impl World {
             normal: Vec3::default(),
             t: 0.0,
             front_face: false,
-            material: Arc::clone(&self.materials[0])
+            material: Arc::clone(&self.materials[0]),
         }
     }
     pub fn add_material<T: Material + 'static>(&mut self, material: T) {
         self.materials.push(Arc::new(material));
     }
-    
+
     //pub fn add_object()
 }

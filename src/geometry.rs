@@ -10,12 +10,11 @@ use rand::rngs::ThreadRng;
 pub type Point3 = Vec3;
 
 #[derive(Debug, Clone, Copy)]
-pub struct Vec3{
+pub struct Vec3 {
     pub x: f64,
     pub y: f64,
     pub z: f64,
 }
-
 
 impl Default for Vec3 {
     fn default() -> Self {
@@ -162,7 +161,7 @@ impl Vec3 {
         vec / lensq.sqrt()
     }
 
-    // Gets a random vector in [-1,1] x [-1,1] 
+    // Gets a random vector in [-1,1] x [-1,1]
     pub fn sample_unit_disk(rng: &mut ThreadRng) -> Vec3 {
         let mut vec = Vec3::new(rng.gen_range(-1.0..1.0), rng.gen_range(-1.0..1.0), 0.0);
         while vec.dot(vec) > 1.0 {
@@ -170,7 +169,6 @@ impl Vec3 {
         }
         vec
     }
-
 }
 
 pub fn degrees_to_radians(degrees: f64) -> f64 {
